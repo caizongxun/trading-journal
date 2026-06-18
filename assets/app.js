@@ -1,7 +1,7 @@
 'use strict';
 
-// UMD CDN exposes window.supabase — use a different variable name to avoid collision
-const sb = window.supabase.createClient(
+// Wait for ESM module to expose createClient, then init
+const sb = window.__supabaseCreateClient(
   'https://bynnmxospdnfnnlaqqzi.supabase.co',
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5bm5teG9zcGRuZm5ubGFxcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5ODQsImV4cCI6MjA5NzM1ODk4NH0.yA0XCwzE8z70p2qGs9s_1QdTDGUK0cOjdAnP9zp_6RM'
 );
@@ -58,7 +58,7 @@ authForm.addEventListener('submit', async e => {
         options: { data: { display_name: displayName } }
       });
       if (error) { showAuthError(error.message); return; }
-      if (data.user && !data.session) showAuthError('✅ 請到信箱確認帳號後再登入。');
+      if (data.user && !data.session) showAuthError('✅ 請到信筱確認帳號後再登入。');
     }
   } catch(err) {
     showAuthError('連線錯誤：' + err.message);
