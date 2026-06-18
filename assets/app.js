@@ -1,11 +1,10 @@
 'use strict';
 
-// Supabase is loaded via UMD CDN in index.html → window.supabase
-const { createClient } = window.supabase;
-
-const SUPABASE_URL = 'https://bynnmxospdnfnnlaqqzi.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5bm5teG9zcGRuZm5ubGFxcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5ODQsImV4cCI6MjA5NzM1ODk4NH0.yA0XCwzE8z70p2qGs9s_1QdTDGUK0cOjdAnP9zp_6RM';
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+// UMD CDN exposes window.supabase — use a different variable name to avoid collision
+const sb = window.supabase.createClient(
+  'https://bynnmxospdnfnnlaqqzi.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5bm5teG9zcGRuZm5ubGFxcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5ODQsImV4cCI6MjA5NzM1ODk4NH0.yA0XCwzE8z70p2qGs9s_1QdTDGUK0cOjdAnP9zp_6RM'
+);
 
 let currentUser = null;
 let currentView = 'dashboard';
@@ -48,14 +47,13 @@ authForm.addEventListener('submit', async e => {
   const password = document.getElementById('password').value;
   authSubmit.disabled = true;
   authSubmit.textContent = '處理中...';
-
   try {
     if (authMode === 'login') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      const { error } = await sb.auth.signInWithPassword({ email, password });
       if (error) showAuthError(error.message);
     } else {
       const displayName = document.getElementById('display-name').value.trim();
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error } = await sb.auth.signUp({
         email, password,
         options: { data: { display_name: displayName } }
       });
@@ -65,7 +63,6 @@ authForm.addEventListener('submit', async e => {
   } catch(err) {
     showAuthError('連線錯誤：' + err.message);
   }
-
   authSubmit.disabled = false;
   authSubmit.textContent = authMode === 'login' ? '登入' : '註冊';
 });
@@ -77,7 +74,7 @@ function showAuthError(msg) {
   authSubmit.textContent = authMode === 'login' ? '登入' : '註冊';
 }
 
-supabase.auth.onAuthStateChange((_event, session) => {
+sb.auth.onAuthStateChange((_event, session) => {
   currentUser = session?.user ?? null;
   if (currentUser) {
     authScreen.style.display = 'none';
@@ -90,7 +87,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
   }
 });
 
-document.getElementById('logout-btn').addEventListener('click', () => supabase.auth.signOut());
+document.getElementById('logout-btn').addEventListener('click', () => sb.auth.signOut());
 
 // ─── VIEW ROUTING ───
 document.querySelectorAll('[data-view]').forEach(el => {
@@ -131,7 +128,7 @@ function esc(str) { const d = document.createElement('div'); d.textContent = str
 
 // ─── DASHBOARD ───
 async function loadDashboard() {
-  const { data: trades } = await supabase.from('trades').select('*').eq('user_id', currentUser.id);
+  const { data: trades } = await sb.from('trades').select('*').eq('user_id', currentUser.id);
   const all = trades || [];
   const closed = all.filter(t => t.status === 'CLOSED');
   const totalPnl = closed.reduce((s, t) => s + Number(t.net_pnl || 0), 0);
@@ -166,7 +163,7 @@ let tradesCache = [];
 async function loadTrades() {
   const statusFilter    = document.getElementById('filter-status').value;
   const directionFilter = document.getElementById('filter-direction').value;
-  let q = supabase.from('trades').select('*').eq('user_id', currentUser.id).order('entry_date', { ascending: false });
+  let q = sb.from('trades').select('*').eq('user_id', currentUser.id).order('entry_date', { ascending: false });
   if (statusFilter)    q = q.eq('status', statusFilter);
   if (directionFilter) q = q.eq('direction', directionFilter);
   const { data } = await q;
@@ -228,7 +225,7 @@ function openTradeModal(trade=null) {
 window.openEditTrade = (id) => { const t = tradesCache.find(x => x.id === id); if(t) openTradeModal(t); };
 window.deleteTrade   = async (id) => {
   if (!confirm('確定刪除這筆交易？')) return;
-  await supabase.from('trades').delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('trades').delete().eq('id', id).eq('user_id', currentUser.id);
   loadTrades();
 };
 
@@ -266,8 +263,8 @@ document.getElementById('trade-form').addEventListener('submit', async e => {
       payload.pnl_pct = payload.net_pnl / (payload.entry_price * payload.entry_qty) * 100;
   }
   const { error } = id
-    ? await supabase.from('trades').update(payload).eq('id', id).eq('user_id', currentUser.id)
-    : await supabase.from('trades').insert(payload);
+    ? await sb.from('trades').update(payload).eq('id', id).eq('user_id', currentUser.id)
+    : await sb.from('trades').insert(payload);
   if (error) { document.getElementById('trade-form-error').textContent = error.message; document.getElementById('trade-form-error').style.display='block'; return; }
   closeModal('trade-modal'); loadTrades();
   if (currentView === 'dashboard') loadDashboard();
@@ -276,7 +273,7 @@ document.getElementById('trade-form').addEventListener('submit', async e => {
 // ─── JOURNAL ───
 let journalCache = [];
 async function loadJournal() {
-  const { data } = await supabase.from('journals').select('*').eq('user_id', currentUser.id).order('journal_date', { ascending: false });
+  const { data } = await sb.from('journals').select('*').eq('user_id', currentUser.id).order('journal_date', { ascending: false });
   journalCache = data || [];
   const container = document.getElementById('journal-list');
   if (!journalCache.length) { container.innerHTML = '<div class="empty-state"><p>尚無日誌</p></div>'; return; }
@@ -316,7 +313,7 @@ function openJournalModal(journal=null) {
 window.openEditJournal = (id) => { const j = journalCache.find(x => x.id===id); if(j) openJournalModal(j); };
 window.deleteJournal   = async (id) => {
   if (!confirm('確定刪除？')) return;
-  await supabase.from('journals').delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('journals').delete().eq('id', id).eq('user_id', currentUser.id);
   loadJournal();
 };
 
@@ -332,8 +329,8 @@ document.getElementById('journal-form').addEventListener('submit', async e => {
     content: document.getElementById('j-content').value,
   };
   const { error } = id
-    ? await supabase.from('journals').update(payload).eq('id', id)
-    : await supabase.from('journals').insert(payload);
+    ? await sb.from('journals').update(payload).eq('id', id)
+    : await sb.from('journals').insert(payload);
   if (error) { document.getElementById('journal-form-error').textContent = error.message; document.getElementById('journal-form-error').style.display='block'; return; }
   closeModal('journal-modal'); loadJournal();
 });
@@ -341,7 +338,7 @@ document.getElementById('journal-form').addEventListener('submit', async e => {
 // ─── WATCHLIST ───
 let watchCache = [];
 async function loadWatchlist() {
-  const { data } = await supabase.from('watchlist').select('*').eq('user_id', currentUser.id).order('added_at', { ascending: false });
+  const { data } = await sb.from('watchlist').select('*').eq('user_id', currentUser.id).order('added_at', { ascending: false });
   watchCache = data || [];
   const tbody = document.getElementById('watchlist-tbody');
   if (!watchCache.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">尚無觀察標的</td></tr>'; return; }
@@ -373,7 +370,7 @@ function openWatchModal(watch=null) {
 window.openEditWatch = (id) => { const w = watchCache.find(x => x.id===id); if(w) openWatchModal(w); };
 window.deleteWatch   = async (id) => {
   if (!confirm('確定刪除？')) return;
-  await supabase.from('watchlist').delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from('watchlist').delete().eq('id', id).eq('user_id', currentUser.id);
   loadWatchlist();
 };
 
@@ -388,8 +385,8 @@ document.getElementById('watch-form').addEventListener('submit', async e => {
     note: document.getElementById('w-note').value || null,
   };
   const { error } = id
-    ? await supabase.from('watchlist').update(payload).eq('id', id)
-    : await supabase.from('watchlist').insert(payload);
+    ? await sb.from('watchlist').update(payload).eq('id', id)
+    : await sb.from('watchlist').insert(payload);
   if (error) { document.getElementById('watch-form-error').textContent = error.message; document.getElementById('watch-form-error').style.display='block'; return; }
   closeModal('watch-modal'); loadWatchlist();
 });
@@ -400,7 +397,7 @@ async function loadExpenses() {
   const type = document.getElementById('filter-exp-type').value;
   const table = type === 'income' ? 'income' : 'expenses';
   const dateField = type === 'income' ? 'income_date' : 'expense_date';
-  const { data } = await supabase.from(table).select('*').eq('user_id', currentUser.id).order(dateField, { ascending: false });
+  const { data } = await sb.from(table).select('*').eq('user_id', currentUser.id).order(dateField, { ascending: false });
   expensesCache = data || [];
   const tbody = document.getElementById('expenses-tbody');
   if (!expensesCache.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">尚無記錄</td></tr>'; return; }
@@ -435,7 +432,7 @@ document.getElementById('new-expense-btn').addEventListener('click', () => {
 window.deleteExpense = async (id, type) => {
   if (!confirm('確定刪除？')) return;
   const table = type === 'income' ? 'income' : 'expenses';
-  await supabase.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
+  await sb.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
   loadExpenses();
 };
 
@@ -451,7 +448,7 @@ document.getElementById('expense-form').addEventListener('submit', async e => {
     description: document.getElementById('exp-desc').value,
     [dateField]: document.getElementById('exp-date').value,
   };
-  const { error } = await supabase.from(table).insert(payload);
+  const { error } = await sb.from(table).insert(payload);
   if (error) { document.getElementById('exp-form-error').textContent = error.message; document.getElementById('exp-form-error').style.display='block'; return; }
   closeModal('expense-modal'); loadExpenses();
 });
