@@ -57,6 +57,7 @@ body{
   font-size:var(--text-sm);
   color:var(--color-text);
   background-color:var(--color-bg);
+  font-weight: 500; /* 加粗內文，解決太細的問題 */
   /* 幾何交叉網格背景 */
   background-image:
     repeating-linear-gradient(45deg, rgba(212, 175, 55, 0.02) 0, rgba(212, 175, 55, 0.02) 1px, transparent 1px, transparent 40px),
@@ -73,7 +74,7 @@ h1, h2, h3, .brand-name, .view-title {
   text-transform: uppercase;
   letter-spacing: 0.15em;
   color: var(--color-primary);
-  font-weight: 400;
+  font-weight: 600; /* 加粗標題 */
 }
 
 /* ─── AUTH ─── */

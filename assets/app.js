@@ -8,6 +8,7 @@ const sb = window.__supabaseCreateClient(
 
 let currentUser = null;
 let currentView = 'dashboard';
+let fundsChartInstance = null;
 
 // ─── THEME ───
 (function(){
@@ -126,36 +127,149 @@ function fmt(n, decimals=0) {
 function pnlClass(n) { return n > 0 ? 'pnl-pos' : n < 0 ? 'pnl-neg' : ''; }
 function esc(str) { const d = document.createElement('div'); d.textContent = str ?? ''; return d.innerHTML; }
 
-// ─── DASHBOARD ───
+// ─── DASHBOARD (記帳與圖表為核心) ───
 async function loadDashboard() {
-  const { data: trades } = await sb.from('trades').select('*').eq('user_id', currentUser.id);
-  const all = trades || [];
-  const closed = all.filter(t => t.status === 'CLOSED');
-  const totalPnl = closed.reduce((s, t) => s + Number(t.net_pnl || 0), 0);
-  const wins = closed.filter(t => Number(t.net_pnl || 0) > 0).length;
-  const winRate = closed.length ? (wins / closed.length * 100).toFixed(1) + '%' : '—';
-  const rrArr = all.filter(t => t.risk_reward).map(t => Number(t.risk_reward));
-  const avgRR = rrArr.length ? (rrArr.reduce((a,b) => a+b, 0) / rrArr.length).toFixed(2) : '—';
+  const [ {data: trades}, {data: income}, {data: expenses} ] = await Promise.all([
+    sb.from('trades').select('*').eq('user_id', currentUser.id),
+    sb.from('income').select('*').eq('user_id', currentUser.id),
+    sb.from('expenses').select('*').eq('user_id', currentUser.id)
+  ]);
 
-  document.getElementById('kpi-total-trades').textContent = all.length;
-  const pnlEl = document.getElementById('kpi-total-pnl');
-  pnlEl.textContent = (totalPnl >= 0 ? '+' : '') + fmt(totalPnl);
-  pnlEl.className = 'kpi-value ' + pnlClass(totalPnl);
-  document.getElementById('kpi-win-rate').textContent = winRate;
-  document.getElementById('kpi-avg-rr').textContent   = avgRR;
+  const allTrades = trades || [];
+  const allIncome = income || [];
+  const allExpenses = expenses || [];
 
-  const recent = all.slice(-5).reverse();
-  const container = document.getElementById('recent-trades-table');
-  if (!recent.length) { container.innerHTML = '<div class="empty-state"><p>尚無交易記錄</p></div>'; return; }
-  container.innerHTML = `<table><thead><tr><th>代號</th><th>方向</th><th>狀態</th><th>進場日</th><th>淨損益</th></tr></thead><tbody>${
-    recent.map(t => `<tr>
-      <td><strong>${esc(t.symbol)}</strong></td>
-      <td><span class="badge badge-${t.direction.toLowerCase()}">${t.direction}</span></td>
-      <td><span class="badge badge-${t.status.toLowerCase()}">${t.status}</span></td>
-      <td>${esc(t.entry_date)}</td>
-      <td class="${pnlClass(t.net_pnl)}">${t.net_pnl != null ? (Number(t.net_pnl)>=0?'+':'') + fmt(t.net_pnl) : '—'}</td>
-    </tr>`).join('')
-  }</tbody></table>`;
+  const currentMonthStr = new Date().toISOString().slice(0, 7);
+
+  // 計算 KPI
+  let totalIncome = 0; let monthIncome = 0;
+  allIncome.forEach(i => {
+    totalIncome += Number(i.amount);
+    if(i.income_date.startsWith(currentMonthStr)) monthIncome += Number(i.amount);
+  });
+
+  let totalExpense = 0; let monthExpense = 0;
+  allExpenses.forEach(e => {
+    totalExpense += Number(e.amount);
+    if(e.expense_date.startsWith(currentMonthStr)) monthExpense += Number(e.amount);
+  });
+
+  const closedTrades = allTrades.filter(t => t.status === 'CLOSED');
+  const totalTradePnl = closedTrades.reduce((s, t) => s + Number(t.net_pnl || 0), 0);
+
+  const totalBalance = totalIncome - totalExpense + totalTradePnl;
+
+  document.getElementById('kpi-total-balance').textContent = fmt(totalBalance);
+  document.getElementById('kpi-month-income').textContent = '+' + fmt(monthIncome);
+  document.getElementById('kpi-month-expense').textContent = '-' + fmt(monthExpense);
+  const pnlEl = document.getElementById('kpi-trade-pnl');
+  pnlEl.textContent = (totalTradePnl >= 0 ? '+' : '') + fmt(totalTradePnl);
+  pnlEl.className = 'kpi-value ' + pnlClass(totalTradePnl);
+
+  // 渲染最近收支紀錄清單
+  const combinedExpenses = [
+    ...allIncome.map(x => ({...x, type: 'income', date: x.income_date})),
+    ...allExpenses.map(x => ({...x, type: 'expense', date: x.expense_date}))
+  ].sort((a,b) => new Date(a.date) - new Date(b.date));
+
+  const recent = combinedExpenses.slice(-5).reverse();
+  const container = document.getElementById('recent-expenses-table');
+
+  if (!recent.length) {
+    container.innerHTML = '<div class="empty-state"><p>尚無收支記錄</p></div>';
+  } else {
+    container.innerHTML = `<table><thead><tr><th>日期</th><th>描述</th><th>金額</th><th>類型</th></tr></thead><tbody>${
+      recent.map(r => `<tr>
+        <td>${esc(r.date)}</td>
+        <td>${esc(r.description || '—')}</td>
+        <td class="${r.type==='income'?'pnl-pos':'pnl-neg'}">${r.type==='income'?'+':'-'}${fmt(r.amount)}</td>
+        <td><span class="badge ${r.type==='income'?'badge-long':'badge-short'}">${r.type==='income'?'收入':'支出'}</span></td>
+      </tr>`).join('')
+    }</tbody></table>`;
+  }
+
+  // 準備資金曲線圖資料
+  const flowByDate = {};
+  combinedExpenses.forEach(x => {
+    if(!flowByDate[x.date]) flowByDate[x.date] = 0;
+    flowByDate[x.date] += (x.type === 'income' ? Number(x.amount) : -Number(x.amount));
+  });
+  closedTrades.forEach(t => {
+    if(!t.exit_date) return;
+    if(!flowByDate[t.exit_date]) flowByDate[t.exit_date] = 0;
+    flowByDate[t.exit_date] += Number(t.net_pnl || 0);
+  });
+
+  const sortedDates = Object.keys(flowByDate).sort((a,b) => new Date(a) - new Date(b));
+  let runningBalance = 0;
+  const chartLabels = [];
+  const chartData = [];
+
+  sortedDates.forEach(date => {
+    runningBalance += flowByDate[date];
+    chartLabels.push(date);
+    chartData.push(runningBalance);
+  });
+
+  renderFundsChart(chartLabels, chartData);
+}
+
+// 繪製資金曲線圖 (Art Deco 配色)
+function renderFundsChart(labels, data) {
+  const ctx = document.getElementById('fundsChart');
+  if(!ctx) return;
+  if(fundsChartInstance) fundsChartInstance.destroy();
+
+  if(labels.length === 0) {
+    labels = [new Date().toISOString().slice(0,10)];
+    data = [0];
+  }
+
+  fundsChartInstance = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: labels,
+      datasets: [{
+        label: '累積總資產',
+        data: data,
+        borderColor: '#D4AF37',
+        backgroundColor: 'rgba(212, 175, 55, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.2,
+        pointBackgroundColor: '#0A0A0A',
+        pointBorderColor: '#D4AF37',
+        pointHoverBackgroundColor: '#D4AF37',
+        pointHoverBorderColor: '#fff',
+        pointRadius: 4,
+        pointHoverRadius: 6
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {
+          grid: { color: 'rgba(212, 175, 55, 0.1)' },
+          ticks: { color: '#F2F0E4', font: { family: 'Josefin Sans' } }
+        },
+        y: {
+          grid: { color: 'rgba(212, 175, 55, 0.1)' },
+          ticks: { color: '#F2F0E4', font: { family: 'Josefin Sans' } }
+        }
+      },
+      plugins: {
+        legend: { labels: { color: '#D4AF37', font: { family: 'Josefin Sans', size: 14 } } },
+        tooltip: {
+          backgroundColor: 'rgba(20, 20, 20, 0.9)',
+          titleFont: { family: 'Josefin Sans', size: 14 },
+          bodyFont: { family: 'Josefin Sans', size: 14 },
+          borderColor: '#D4AF37',
+          borderWidth: 1
+        }
+      }
+    }
+  });
 }
 
 // ─── TRADES ───
@@ -401,36 +515,40 @@ async function loadExpenses() {
   expensesCache = data || [];
   const tbody = document.getElementById('expenses-tbody');
   if (!expensesCache.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-cell">尚無記錄</td></tr>'; return; }
-  tbody.innerHTML = expensesCache.map(ex => {
-    const dateVal = ex.expense_date || ex.income_date;
-    return `<tr>
-      <td>${esc(dateVal)}</td>
-      <td>${esc(ex.description||'—')}</td>
-      <td class="pnl-${type==='income'?'pos':'neg'}">${type==='income'?'+':'-'}${fmt(ex.amount)}</td>
-      <td>${esc(ex.currency||'TWD')}</td>
-      <td>${esc(ex.payment_method||ex.source||'—')}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="window.deleteExpense('${ex.id}','${type}')">刪除</button></td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML = expensesCache.map(e => `<tr>
+    <td>${esc(e[dateField])}</td>
+    <td>${esc(e.description||'—')}</td>
+    <td class="${type==='income'?'pnl-pos':'pnl-neg'}">${type==='income'?'+':'-'}${fmt(e.amount)}</td>
+    <td>${esc(e.currency||'TWD')}</td>
+    <td>${esc(e.payment_method||'—')}</td>
+    <td>
+      <button class="btn btn-ghost btn-sm" onclick="window.openEditExpense('${e.id}')">編輯</button>
+      <button class="btn btn-danger btn-sm" onclick="window.deleteExpense('${e.id}')">刪除</button>
+    </td>
+  </tr>`).join('');
 }
 
 document.getElementById('filter-exp-type').addEventListener('change', loadExpenses);
+document.getElementById('new-expense-btn').addEventListener('click', () => openExpenseModal());
 
-document.getElementById('new-expense-btn').addEventListener('click', () => {
+function openExpenseModal(expense=null) {
   const type = document.getElementById('filter-exp-type').value;
-  document.getElementById('exp-type').value  = type;
-  document.getElementById('expense-modal-title').textContent = type === 'income' ? '新增收入' : '新增支出';
-  document.getElementById('exp-id').value    = '';
-  document.getElementById('exp-date').value  = new Date().toISOString().slice(0,10);
-  document.getElementById('exp-amount').value = '';
-  document.getElementById('exp-currency').value = 'TWD';
-  document.getElementById('exp-desc').value  = '';
+  const dateField = type === 'income' ? 'income_date' : 'expense_date';
+  document.getElementById('expense-modal-title').textContent = expense ? (type==='income'?'編輯收入':'編輯支出') : (type==='income'?'新增收入':'新增支出');
+  document.getElementById('exp-id').value       = expense?.id || '';
+  document.getElementById('exp-type').value     = type;
+  document.getElementById('exp-date').value     = expense?.[dateField] || new Date().toISOString().slice(0,10);
+  document.getElementById('exp-amount').value   = expense?.amount || '';
+  document.getElementById('exp-currency').value = expense?.currency || 'TWD';
+  document.getElementById('exp-desc').value     = expense?.description || '';
   document.getElementById('exp-form-error').style.display = 'none';
   document.getElementById('expense-modal').style.display = 'flex';
-});
+}
 
-window.deleteExpense = async (id, type) => {
+window.openEditExpense = (id) => { const e = expensesCache.find(x => x.id===id); if(e) openExpenseModal(e); };
+window.deleteExpense   = async (id) => {
   if (!confirm('確定刪除？')) return;
+  const type = document.getElementById('filter-exp-type').value;
   const table = type === 'income' ? 'income' : 'expenses';
   await sb.from(table).delete().eq('id', id).eq('user_id', currentUser.id);
   loadExpenses();
@@ -438,27 +556,30 @@ window.deleteExpense = async (id, type) => {
 
 document.getElementById('expense-form').addEventListener('submit', async e => {
   e.preventDefault();
-  const type  = document.getElementById('exp-type').value;
+  const id   = document.getElementById('exp-id').value;
+  const type = document.getElementById('exp-type').value;
   const table = type === 'income' ? 'income' : 'expenses';
   const dateField = type === 'income' ? 'income_date' : 'expense_date';
   const payload = {
     user_id: currentUser.id,
-    amount: parseFloat(document.getElementById('exp-amount').value),
-    currency: document.getElementById('exp-currency').value,
-    description: document.getElementById('exp-desc').value,
     [dateField]: document.getElementById('exp-date').value,
+    amount: parseFloat(document.getElementById('exp-amount').value),
+    currency: document.getElementById('exp-currency').value || 'TWD',
+    description: document.getElementById('exp-desc').value,
   };
-  const { error } = await sb.from(table).insert(payload);
+  const { error } = id
+    ? await sb.from(table).update(payload).eq('id', id).eq('user_id', currentUser.id)
+    : await sb.from(table).insert(payload);
   if (error) { document.getElementById('exp-form-error').textContent = error.message; document.getElementById('exp-form-error').style.display='block'; return; }
   closeModal('expense-modal'); loadExpenses();
+  if (currentView === 'dashboard') loadDashboard();
 });
 
 // ─── MODAL CLOSE ───
 function closeModal(id) { document.getElementById(id).style.display = 'none'; }
-
 document.querySelectorAll('[data-modal]').forEach(btn => {
   btn.addEventListener('click', () => closeModal(btn.dataset.modal));
 });
 document.querySelectorAll('.modal-overlay').forEach(overlay => {
-  overlay.addEventListener('click', e => { if(e.target === overlay) overlay.style.display = 'none'; });
+  overlay.addEventListener('click', e => { if(e.target === overlay) closeModal(overlay.id); });
 });

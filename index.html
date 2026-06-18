@@ -6,7 +6,8 @@
   <title>Trading Journal</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@300;400;600&family=Marcellus&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&family=Marcellus&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" href="./assets/style.css" />
 </head>
 <body>
@@ -61,6 +62,10 @@
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
         總覽
       </a>
+      <a href="#expenses" class="nav-item" data-view="expenses">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        收支記帳
+      </a>
       <a href="#trades" class="nav-item" data-view="trades">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
         交易記錄
@@ -72,10 +77,6 @@
       <a href="#watchlist" class="nav-item" data-view="watchlist">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
         觀察清單
-      </a>
-      <a href="#expenses" class="nav-item" data-view="expenses">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        收支記帳
       </a>
     </nav>
     <div class="sidebar-footer">
@@ -96,14 +97,22 @@
 
     <section id="view-dashboard" class="view active">
       <div class="kpi-grid">
-        <div class="kpi-card"><div class="kpi-label">總交易筆數</div><div class="kpi-value" id="kpi-total-trades">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">已結單 P&amp;L</div><div class="kpi-value" id="kpi-total-pnl">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">勝率</div><div class="kpi-value" id="kpi-win-rate">—</div></div>
-        <div class="kpi-card"><div class="kpi-label">平均 R/R</div><div class="kpi-value" id="kpi-avg-rr">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">總資產餘額</div><div class="kpi-value" id="kpi-total-balance">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">本月收入</div><div class="kpi-value pnl-pos" id="kpi-month-income">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">本月支出</div><div class="kpi-value pnl-neg" id="kpi-month-expense">—</div></div>
+        <div class="kpi-card"><div class="kpi-label">累積交易淨利</div><div class="kpi-value" id="kpi-trade-pnl">—</div></div>
       </div>
+
       <div class="section-card" style="margin-top:var(--space-6)">
-        <div class="section-card-header"><h2>最近交易</h2><a href="#trades" class="btn btn-ghost btn-sm" data-view="trades">查看全部</a></div>
-        <div id="recent-trades-table"><div class="empty-state"><p>尚無交易記錄</p></div></div>
+        <div class="section-card-header"><h2>資金曲線</h2></div>
+        <div style="padding: var(--space-4); height: 300px;">
+          <canvas id="fundsChart"></canvas>
+        </div>
+      </div>
+
+      <div class="section-card" style="margin-top:var(--space-6)">
+        <div class="section-card-header"><h2>最近收支</h2><a href="#expenses" class="btn btn-ghost btn-sm" data-view="expenses">查看全部</a></div>
+        <div id="recent-expenses-table"><div class="empty-state"><p>尚無記錄</p></div></div>
       </div>
     </section>
 
