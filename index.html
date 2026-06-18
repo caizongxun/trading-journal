@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-TW" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Trading Journal</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300..700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="./assets/style.css" />
+</head>
+<body>
+
+<!-- ─── AUTH SCREEN ─── -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <svg width="36" height="36" viewBox="0 0 36 36" fill="none" aria-label="Trading Journal logo">
+        <rect width="36" height="36" rx="8" fill="#4f98a3"/>
+        <polyline points="6,26 13,16 20,21 30,8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="30" cy="8" r="2.5" fill="white"/>
+      </svg>
+      <span class="auth-brand">Trading Journal</span>
+    </div>
+    <div class="auth-tabs">
+      <button class="auth-tab active" data-tab="login">登入</button>
+      <button class="auth-tab" data-tab="signup">註冊</button>
+    </div>
+    <form id="auth-form">
+      <div id="signup-name-field" class="form-group" style="display:none">
+        <label for="display-name">顯示名稱</label>
+        <input type="text" id="display-name" placeholder="你的名字" />
+      </div>
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" placeholder="user@example.com" required />
+      </div>
+      <div class="form-group">
+        <label for="password">密碼</label>
+        <input type="password" id="password" placeholder="••••••••" required minlength="6" />
+      </div>
+      <div id="auth-error" class="auth-error" style="display:none"></div>
+      <button type="submit" class="btn btn-primary btn-full" id="auth-submit">登入</button>
+    </form>
+  </div>
+</div>
+
+<!-- ─── APP SHELL ─── -->
+<div id="app-shell" class="app-shell" style="display:none">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+        <rect width="36" height="36" rx="8" fill="#4f98a3"/>
+        <polyline points="6,26 13,16 20,21 30,8" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+        <circle cx="30" cy="8" r="2.5" fill="white"/>
+      </svg>
+      <span class="brand-name">TJ</span>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="#dashboard" class="nav-item active" data-view="dashboard">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
+        總覽
+      </a>
+      <a href="#trades" class="nav-item" data-view="trades">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        交易記錄
+      </a>
+      <a href="#journal" class="nav-item" data-view="journal">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        交易日誌
+      </a>
+      <a href="#watchlist" class="nav-item" data-view="watchlist">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+        觀察清單
+      </a>
+      <a href="#expenses" class="nav-item" data-view="expenses">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+        收支記帳
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <span id="user-email-display" class="user-email"></span>
+      <button class="btn btn-ghost btn-sm" id="logout-btn">登出</button>
+    </div>
+  </aside>
+
+  <!-- Main content -->
+  <main class="main-content">
+    <header class="topbar">
+      <h1 id="view-title" class="view-title">總覽</h1>
+      <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" data-theme-toggle aria-label="切換主題">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ── DASHBOARD VIEW ── -->
+    <section id="view-dashboard" class="view active">
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-label">總交易筆數</div>
+          <div class="kpi-value" id="kpi-total-trades">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">已結單 P&L</div>
+          <div class="kpi-value" id="kpi-total-pnl">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">勝率</div>
+          <div class="kpi-value" id="kpi-win-rate">—</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-label">平均 R/R</div>
+          <div class="kpi-value" id="kpi-avg-rr">—</div>
+        </div>
+      </div>
+      <div class="section-card" style="margin-top:var(--space-6)">
+        <div class="section-card-header">
+          <h2>最近交易</h2>
+          <a href="#trades" class="btn btn-ghost btn-sm" data-view="trades">查看全部</a>
+        </div>
+        <div id="recent-trades-table"><div class="empty-state"><p>尚無交易記錄</p></div></div>
+      </div>
+    </section>
+
+    <!-- ── TRADES VIEW ── -->
+    <section id="view-trades" class="view">
+      <div class="view-toolbar">
+        <div class="toolbar-filters">
+          <select id="filter-status" class="select-sm">
+            <option value="">全部狀態</option>
+            <option value="OPEN">持倉中</option>
+            <option value="CLOSED">已結單</option>
+          </select>
+          <select id="filter-direction" class="select-sm">
+            <option value="">多/空</option>
+            <option value="LONG">多 LONG</option>
+            <option value="SHORT">空 SHORT</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="new-trade-btn">+ 新增交易</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="trades-table">
+          <thead>
+            <tr>
+              <th>代號</th><th>市場</th><th>方向</th><th>狀態</th>
+              <th>進場日</th><th>進場價</th><th>數量</th>
+              <th>出場價</th><th>淨損益</th><th>評分</th><th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="trades-tbody"><tr><td colspan="11" class="empty-cell">尚無資料</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── JOURNAL VIEW ── -->
+    <section id="view-journal" class="view">
+      <div class="view-toolbar">
+        <div></div>
+        <button class="btn btn-primary btn-sm" id="new-journal-btn">+ 新增日誌</button>
+      </div>
+      <div id="journal-list" class="journal-list"><div class="empty-state"><p>尚無日誌</p></div></div>
+    </section>
+
+    <!-- ── WATCHLIST VIEW ── -->
+    <section id="view-watchlist" class="view">
+      <div class="view-toolbar">
+        <div></div>
+        <button class="btn btn-primary btn-sm" id="new-watch-btn">+ 加入觀察</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="watchlist-table">
+          <thead><tr><th>代號</th><th>市場</th><th>提醒價</th><th>備注</th><th>加入時間</th><th>操作</th></tr></thead>
+          <tbody id="watchlist-tbody"><tr><td colspan="6" class="empty-cell">尚無觀察標的</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ── EXPENSES VIEW ── -->
+    <section id="view-expenses" class="view">
+      <div class="view-toolbar">
+        <div class="toolbar-filters">
+          <select id="filter-exp-type" class="select-sm">
+            <option value="expense">支出</option>
+            <option value="income">收入</option>
+          </select>
+        </div>
+        <button class="btn btn-primary btn-sm" id="new-expense-btn">+ 新增記錄</button>
+      </div>
+      <div class="table-wrapper">
+        <table id="expenses-table">
+          <thead><tr><th>日期</th><th>描述</th><th>金額</th><th>幣別</th><th>付款方式</th><th>操作</th></tr></thead>
+          <tbody id="expenses-tbody"><tr><td colspan="6" class="empty-cell">尚無記錄</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ─── MODALS ─── -->
+<!-- Trade Modal -->
+<div id="trade-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3 id="trade-modal-title">新增交易</h3><button class="modal-close" data-modal="trade-modal">✕</button></div>
+    <form id="trade-form" class="modal-body">
+      <input type="hidden" id="trade-id" />
+      <div class="form-row">
+        <div class="form-group"><label>代號 *</label><input type="text" id="t-symbol" required placeholder="2330 / AAPL" /></div>
+        <div class="form-group"><label>市場</label>
+          <select id="t-market"><option value="TW">台股 TW</option><option value="US">美股 US</option><option value="CRYPTO">加密 CRYPTO</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>方向 *</label>
+          <select id="t-direction"><option value="LONG">多 LONG</option><option value="SHORT">空 SHORT</option></select>
+        </div>
+        <div class="form-group"><label>狀態</label>
+          <select id="t-status"><option value="OPEN">持倉中</option><option value="CLOSED">已結單</option><option value="PARTIAL">部分出場</option></select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>進場日 *</label><input type="date" id="t-entry-date" required /></div>
+        <div class="form-group"><label>進場價 *</label><input type="number" id="t-entry-price" step="0.01" required /></div>
+        <div class="form-group"><label>數量 *</label><input type="number" id="t-entry-qty" step="0.01" required /></div>
+        <div class="form-group"><label>進場手續費</label><input type="number" id="t-entry-fee" step="0.01" value="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>出場日</label><input type="date" id="t-exit-date" /></div>
+        <div class="form-group"><label>出場價</label><input type="number" id="t-exit-price" step="0.01" /></div>
+        <div class="form-group"><label>出場數量</label><input type="number" id="t-exit-qty" step="0.01" /></div>
+        <div class="form-group"><label>出場手續費</label><input type="number" id="t-exit-fee" step="0.01" value="0" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>停損</label><input type="number" id="t-stop-loss" step="0.01" /></div>
+        <div class="form-group"><label>目標</label><input type="number" id="t-take-profit" step="0.01" /></div>
+        <div class="form-group"><label>評分 (1-5)</label><input type="number" id="t-rating" min="1" max="5" /></div>
+      </div>
+      <div class="form-group"><label>進場理由 / Thesis</label><textarea id="t-thesis" rows="2" placeholder="為何進場..."></textarea></div>
+      <div class="form-group"><label>錯誤 / Mistakes</label><textarea id="t-mistakes" rows="2"></textarea></div>
+      <div class="form-group"><label>心得 / Lessons</label><textarea id="t-lessons" rows="2"></textarea></div>
+      <div id="trade-form-error" class="auth-error" style="display:none"></div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-modal="trade-modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Journal Modal -->
+<div id="journal-modal" class="modal-overlay" style="display:none">
+  <div class="modal">
+    <div class="modal-header"><h3 id="journal-modal-title">新增日誌</h3><button class="modal-close" data-modal="journal-modal">✕</button></div>
+    <form id="journal-form" class="modal-body">
+      <input type="hidden" id="journal-id" />
+      <div class="form-row">
+        <div class="form-group"><label>日期 *</label><input type="date" id="j-date" required /></div>
+        <div class="form-group"><label>情緒 (1-5)</label><input type="number" id="j-mood" min="1" max="5" /></div>
+        <div class="form-group"><label>市場傾向</label>
+          <select id="j-bias"><option value="">-</option><option value="BULLISH">多頭</option><option value="BEARISH">空頭</option><option value="NEUTRAL">中性</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>標題</label><input type="text" id="j-title" placeholder="今日重點..."/></div>
+      <div class="form-group"><label>內容 *</label><textarea id="j-content" rows="6" required placeholder="今日市場觀察、心得..."></textarea></div>
+      <div id="journal-form-error" class="auth-error" style="display:none"></div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-modal="journal-modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Watchlist Modal -->
+<div id="watch-modal" class="modal-overlay" style="display:none">
+  <div class="modal modal-sm">
+    <div class="modal-header"><h3>加入觀察清單</h3><button class="modal-close" data-modal="watch-modal">✕</button></div>
+    <form id="watch-form" class="modal-body">
+      <input type="hidden" id="watch-id" />
+      <div class="form-row">
+        <div class="form-group"><label>代號 *</label><input type="text" id="w-symbol" required /></div>
+        <div class="form-group"><label>市場</label>
+          <select id="w-market"><option value="TW">TW</option><option value="US">US</option><option value="CRYPTO">CRYPTO</option></select>
+        </div>
+        <div class="form-group"><label>提醒價</label><input type="number" id="w-alert" step="0.01" /></div>
+      </div>
+      <div class="form-group"><label>備注</label><input type="text" id="w-note" /></div>
+      <div id="watch-form-error" class="auth-error" style="display:none"></div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-modal="watch-modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>
+    </form>
+  </div>
+</div>
+
+<!-- Expense Modal -->
+<div id="expense-modal" class="modal-overlay" style="display:none">
+  <div class="modal modal-sm">
+    <div class="modal-header"><h3 id="expense-modal-title">新增支出</h3><button class="modal-close" data-modal="expense-modal">✕</button></div>
+    <form id="expense-form" class="modal-body">
+      <input type="hidden" id="exp-id" />
+      <input type="hidden" id="exp-type" value="expense" />
+      <div class="form-row">
+        <div class="form-group"><label>日期 *</label><input type="date" id="exp-date" required /></div>
+        <div class="form-group"><label>金額 *</label><input type="number" id="exp-amount" step="0.01" required /></div>
+        <div class="form-group"><label>幣別</label>
+          <select id="exp-currency"><option value="TWD">TWD</option><option value="USD">USD</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label>描述 *</label><input type="text" id="exp-desc" required /></div>
+      <div id="exp-form-error" class="auth-error" style="display:none"></div>
+      <div class="modal-footer"><button type="button" class="btn btn-ghost" data-modal="expense-modal">取消</button><button type="submit" class="btn btn-primary">儲存</button></div>
+    </form>
+  </div>
+</div>
+
+<script src="./assets/app.js"></script>
+</body>
+</html>
