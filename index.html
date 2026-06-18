@@ -7,8 +7,6 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@300..700&display=swap" rel="stylesheet">
-  <!-- Supabase UMD must load BEFORE app.js -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
   <link rel="stylesheet" href="./assets/style.css" />
 </head>
 <body>
@@ -246,7 +244,11 @@
   </div>
 </div>
 
-<!-- app.js loads AFTER Supabase UMD is ready in <head> -->
-<script src="./assets/app.js"></script>
+<!-- Load Supabase via ESM, then app.js as module — avoids UMD global variable collision -->
+<script type="module">
+  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+  window.__supabaseCreateClient = createClient;
+</script>
+<script type="module" src="./assets/app.js"></script>
 </body>
 </html>
