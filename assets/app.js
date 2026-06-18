@@ -1,7 +1,7 @@
-// KEY FIX: import Supabase as ESM module — guarantees it's ready before any code runs
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
 'use strict';
+
+// Supabase is loaded via UMD CDN in index.html → window.supabase
+const { createClient } = window.supabase;
 
 const SUPABASE_URL = 'https://bynnmxospdnfnnlaqqzi.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJ5bm5teG9zcGRuZm5ubGFxcXppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3ODI5ODQsImV4cCI6MjA5NzM1ODk4NH0.yA0XCwzE8z70p2qGs9s_1QdTDGUK0cOjdAnP9zp_6RM';
