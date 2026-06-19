@@ -531,22 +531,54 @@ async function loadExpenses() {
 document.getElementById('filter-exp-type').addEventListener('change', loadExpenses);
 document.getElementById('new-expense-btn').addEventListener('click', () => openExpenseModal());
 
-function openExpenseModal(expense=null) {
-  const type = document.getElementById('filter-exp-type').value;
+// ─── EXPENSE MODAL TYPE TABS ───
+document.querySelectorAll('.exp-type-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    const selected = tab.dataset.expTab;
+    document.querySelectorAll('.exp-type-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById('exp-type').value = selected;
+    // 更新 modal 標題
+    const isEdit = !!document.getElementById('exp-id').value;
+    document.getElementById('expense-modal-title').textContent =
+      isEdit ? (selected === 'income' ? '編輯收入' : '編輯支出')
+             : (selected === 'income' ? '新增收入' : '新增支出');
+  });
+});
+
+function setExpTypeTab(type) {
+  document.querySelectorAll('.exp-type-tab').forEach(t => {
+    t.classList.toggle('active', t.dataset.expTab === type);
+  });
+  document.getElementById('exp-type').value = type;
+}
+
+function openExpenseModal(expense=null, forceType=null) {
+  // 決定類型：編輯時用資料本身的類型，新增時沿用外部 filter 或強制指定
+  const type = forceType ||
+    (expense ? (expense._type || document.getElementById('filter-exp-type').value) : document.getElementById('filter-exp-type').value);
   const dateField = type === 'income' ? 'income_date' : 'expense_date';
-  document.getElementById('expense-modal-title').textContent = expense ? (type==='income'?'編輯收入':'編輯支出') : (type==='income'?'新增收入':'新增支出');
+
+  document.getElementById('expense-modal-title').textContent =
+    expense ? (type === 'income' ? '編輯收入' : '編輯支出') : (type === 'income' ? '新增收入' : '新增支出');
+
+  setExpTypeTab(type);
   document.getElementById('exp-id').value       = expense?.id || '';
-  document.getElementById('exp-type').value     = type;
   document.getElementById('exp-date').value     = expense?.[dateField] || new Date().toISOString().slice(0,10);
   document.getElementById('exp-amount').value   = expense?.amount || '';
   document.getElementById('exp-currency').value = expense?.currency || 'TWD';
   document.getElementById('exp-desc').value     = expense?.description || '';
+  document.getElementById('exp-payment').value  = expense?.payment_method || 'CASH';
   document.getElementById('exp-form-error').style.display = 'none';
   document.getElementById('expense-modal').style.display = 'flex';
 }
 
-window.openEditExpense = (id) => { const e = expensesCache.find(x => x.id===id); if(e) openExpenseModal(e); };
-window.deleteExpense   = async (id) => {
+window.openEditExpense = (id) => {
+  const e = expensesCache.find(x => x.id === id);
+  if (e) openExpenseModal(e);
+};
+
+window.deleteExpense = async (id) => {
   if (!confirm('確定刪除？')) return;
   const type = document.getElementById('filter-exp-type').value;
   const table = type === 'income' ? 'income' : 'expenses';
@@ -566,6 +598,7 @@ document.getElementById('expense-form').addEventListener('submit', async e => {
     amount: parseFloat(document.getElementById('exp-amount').value),
     currency: document.getElementById('exp-currency').value || 'TWD',
     description: document.getElementById('exp-desc').value,
+    payment_method: document.getElementById('exp-payment').value || 'CASH',
   };
   const { error } = id
     ? await sb.from(table).update(payload).eq('id', id).eq('user_id', currentUser.id)
