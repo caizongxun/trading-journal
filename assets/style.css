@@ -340,37 +340,74 @@ tbody td { padding: var(--space-3) var(--space-4); color: var(--color-text); ver
   outline: none;
 }
 
-/* ─── EXPENSE TYPE TABS (收入/支出切換) ─── */
+/* 修改 form-group 內的 select 樣式 */
+.form-group select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: transparent;
+  /* 自訂金色下拉箭頭 */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23D4AF37' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c%2fpolyline%3e%3c%2fsvg%3e");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 16px;
+  padding-right: 32px;
+  border-radius: 0;
+  cursor: pointer;
+  color: var(--color-text);
+}
+
+.form-group select:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 10px rgba(212, 175, 55, 0.15);
+}
+
+/* 讓下拉選單的選項(options)變成深色底、金字 */
+.form-group select option {
+  background-color: var(--color-surface);
+  color: var(--color-primary);
+  font-family: var(--font-body);
+}
+
+/* ─── EXPENSE TYPE TABS (Art Deco Style) ─── */
 .exp-type-tabs {
   display: flex;
-  background: var(--color-surface-2);
-  border-radius: var(--radius-md);
-  padding: 3px;
+  border: 1px solid var(--color-border);
+  background: transparent;
   margin-bottom: var(--space-4);
-  gap: 2px;
+  padding: 0;
 }
+
 .exp-type-tab {
   flex: 1;
   padding: var(--space-2) var(--space-3);
-  border-radius: calc(var(--radius-md) - 2px);
   font-size: 13px;
-  font-weight: 600;
+  font-family: var(--font-display);
+  letter-spacing: 0.1em;
   color: var(--color-text-muted);
-  letter-spacing: 0.04em;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--color-border);
   transition: all var(--transition);
   text-align: center;
+  text-transform: uppercase;
 }
-.exp-type-tab[data-exp-tab='expense'].active {
-  background: rgba(224,82,82,0.85);
-  color: #fff;
+
+.exp-type-tab:last-child {
+  border-right: none;
 }
-.exp-type-tab[data-exp-tab='income'].active {
-  background: rgba(76,175,125,0.85);
-  color: #fff;
+
+/* 點擊啟動時的視覺反應 (取代原本的紅綠色) */
+.exp-type-tab.active {
+  background: var(--color-primary);
+  color: #0A0A0A;
+  font-weight: 600;
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.2);
 }
+
 .exp-type-tab:not(.active):hover {
-  background: var(--color-surface);
   color: var(--color-text);
+  background: var(--color-surface-2);
 }
 
 /* ─── MODALS ─── */
